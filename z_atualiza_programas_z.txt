@@ -1,0 +1,85 @@
+* Report  : Z_ATUALIZA_PROGRAMAS_Z
+* Autor   : Luiz Guni
+* Data    : 22.08.2025
+* Descrição:
+*   Atualiza a tabela Z0FI_PROGRAMAS com os programas Z originais
+*   encontrados na TRDIR (sem includes, function-pools e enhancements).
+*---------------------------------------------------------------------*
+
+REPORT z_atualiza_programas_z.
+
+TYPES: BEGIN OF ty_name,
+         name TYPE trdir-name,
+       END OF ty_name.
+
+DATA: lt_all   TYPE STANDARD TABLE OF ty_name,
+      ls_all   TYPE ty_name,
+      lt_exist TYPE STANDARD TABLE OF z0fi_programas-programa,
+      lv_total TYPE i,
+      lv_exist TYPE i,
+      lv_new   TYPE i,
+      ls_z     TYPE z0fi_programas.
+
+START-OF-SELECTION.
+
+  " Busca apenas programas Z originais (reports executáveis)
+  SELECT name
+    INTO TABLE lt_all
+    FROM trdir
+    WHERE name LIKE 'Z%'
+      AND subc = '1'.
+
+  SORT lt_all BY name.
+  DELETE ADJACENT DUPLICATES FROM lt_all COMPARING name.
+
+  " Carrega os já existentes
+  SELECT programa
+    INTO TABLE lt_exist
+    FROM z0fi_programas.
+
+  SORT lt_exist ASCENDING.
+
+  " Cabeçalho da saída
+  FORMAT COLOR COL_HEADING INTENSIFIED ON.
+  WRITE: / '=========================================================='.
+  WRITE: / ' Relatório de Atualização - Programas Z Originais (TRDIR) '.
+  WRITE: / '=========================================================='.
+  FORMAT RESET.
+
+  " Loop nos programas
+  LOOP AT lt_all INTO ls_all.
+    READ TABLE lt_exist WITH KEY table_line = ls_all-name
+                        BINARY SEARCH
+                        TRANSPORTING NO FIELDS.
+    IF sy-subrc <> 0.
+      CLEAR ls_z.
+      ls_z-programa = ls_all-name.
+      INSERT z0fi_programas FROM ls_z.
+      IF sy-subrc = 0.
+        lv_new = lv_new + 1.
+        FORMAT COLOR COL_POSITIVE.
+        WRITE: / 'Inserido:', ls_all-name.
+        FORMAT RESET.
+      ENDIF.
+    ELSE.
+      FORMAT COLOR COL_NORMAL.
+      WRITE: / 'Já existia:', ls_all-name.
+      FORMAT RESET.
+    ENDIF.
+  ENDLOOP.
+
+  COMMIT WORK.
+
+  " Resumo final
+  DESCRIBE TABLE lt_all   LINES lv_total.
+  DESCRIBE TABLE lt_exist LINES lv_exist.
+
+  SKIP.
+  WRITE: / '----------------------------------------------------------'.
+  FORMAT COLOR COL_TOTAL INTENSIFIED ON.
+  WRITE: / 'Resumo da execução:'.
+  FORMAT RESET.
+  WRITE: / 'Total de programas Z encontrados na TRDIR:', lv_total.
+  WRITE: / 'Já existentes na Z0FI_PROGRAMAS          :', lv_exist.
+  WRITE: / 'Novos inseridos                          :', lv_new.
+O ChatGPT disse:
